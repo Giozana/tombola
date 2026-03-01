@@ -25,11 +25,23 @@
         const isAdmin = !isMobile;
 
         window.onload = () => {
-            renderTabellone();
-            ascoltaCambiamenti();
-            // Mostra i tasti di controllo solo se sei su PC
-            if(isAdmin) document.getElementById('admin-controls').classList.remove('hidden');
-        };
+    renderTabellone();
+    ascoltaCambiamenti();
+
+    // Controlla se nell'indirizzo c'è scritto "?view=tv"
+    const urlParams = new URLSearchParams(window.location.search);
+    const isTV = urlParams.get('view') === 'tv';
+
+    if (isAdmin && !isTV) {
+        // Mostra i controlli solo se è Admin E NON è in modalità TV
+        document.getElementById('admin-controls').classList.remove('hidden');
+    }
+    
+    if (isTV) {
+        // Opzionale: ingrandisce il tabellone per il proiettore
+        document.getElementById('grid-container').classList.add('scale-110', 'mt-10');
+    }
+};
 
         // Crea la griglia 1-90
         function renderTabellone() {
