@@ -117,11 +117,83 @@
                 }
             });
         }
+// Aggiungi questi riferimenti ai nuovi nodi del database
+const premiRef = ref(db, 'premi');
+const annuncioRef = ref(db, 'annuncioAttivo');
+
+// Funzione per l'operatore: aggiorna il numero di premi disponibili
+window.updatePremi = () => {
+    const c = document.getElementById('input-cinquine').value;
+    const t = document.getElementById('input-tombole').value;
+    set(premiRef, { cinquine: parseInt(c), tombole: parseInt(t) });
+};
+
+// Funzione per annunciare e scalare il premio
+window.annunciaPremio = (tipo) => {
+    let msg = "";
+    if(tipo === 'CINQUINA') msg = "CINQUINA FATTA!";
+    if(tipo === 'TOMBOLA') msg = "TOMBOLA FATTA!";
+    if(tipo === 'FINE') msg = "GIOCO TERMINATO";
+
+    // Mostra l'annuncio a tutti
+    set(annuncioRef, { testo: msg, ts: Date.now() });
+
+    // Se è un premio, scala il contatore
+    if(tipo === 'CINQUINA' || tipo === 'TOMBOLA') {
+        onValue(premiRef, (snap) => {
+            const attuali = snap.val() || { cinquine: 0, tombole: 0 };
+            if(tipo === 'CINQUINA' && attuali.cinquine > 0) {
+                update(premiRef, { cinquine: attuali.cinquine - 1 });
+            } else if(tipo === 'TOMBOLA' && attuali.tombole > 0) {
+                update(premiRef, { tombole: attuali.tombole - 1 });
+            }
+        }, { onlyOnce: true });
+    }
+};
+
+// Modifica la tua funzione ascoltaCambiamenti() aggiungendo questi listener:
+function ascoltaCambiamenti(isTV) {
+    // ... (mantieni i listener esistenti per tabellone e ultimoEstratto)
+
+    // Listener per i contatori dei premi
+    onValue(premiRef, (snapshot) => {
+        const d = snapshot.val() || { cinquine: 0, tombole: 0 };
+        document.getElementById('display-cinquine').innerText = d.cinquine;
+        document.getElementById('display-tombole').innerText = d.tombole;
+        // Aggiorna anche gli input dell'admin se non li sta toccando
+        if(isAdmin) {
+            document.getElementById('input-cinquine').value = d.cinquine;
+            document.getElementById('input-tombole').value = d.tombole;
+        }
+    });
+
+    // Listener per gli annunci (Solo Smartphone e TV)
+    onValue(annuncioRef, (snapshot) => {
+        const data = snapshot.val();
+        if ((isMobile || isTV) && data && data.testo) {
+            const overlay = document.getElementById('overlay-premio');
+            document.getElementById('testo-premio-valore').innerText = data.testo;
+            overlay.classList.replace('hidden', 'flex');
+            
+            // Se è "FINE GIOCO", non farlo sparire subito
+            if(data.testo !== "GIOCO TERMINATO") {
+                setTimeout(() => {
+                    overlay.classList.replace('flex', 'hidden');
+                }, 6000); // 6 secondi di gloria
+            }
+        }
+    });
+}
     </script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans overflow-x-hidden">
 
     <div id="overlay-estrazione" class="hidden fixed inset-0 z-50 bg-blue-600 flex-col items-center justify-center text-center p-6">
+<div id="overlay-premio" class="hidden fixed inset-0 z-[60] bg-yellow-500 flex-col items-center justify-center text-center p-6 animate-pulse">
+    <div id="testo-premio-titolo" class="text-2xl font-bold uppercase text-slate-900 tracking-widest">ANNUNCIO!</div>
+    <div id="testo-premio-valore" class="text-6xl font-black text-white drop-shadow-lg my-4 italic">---</div>
+    <button onclick="document.getElementById('overlay-premio').classList.replace('flex','hidden')" class="mt-8 bg-slate-900 text-white px-6 py-2 rounded-full font-bold">CHIUDI</button>
+</div>
         <div class="bg-white text-blue-600 rounded-full px-8 py-2 mb-4 font-black uppercase tracking-widest shadow-2xl">
             È stato estratto il numero
         </div>
@@ -138,6 +210,33 @@
                     🔄 RESETTA TABELLONE
                 </button>
                 <p class="text-[10px] text-slate-400 mt-2 uppercase tracking-widest">Clicca per estrarre | Clicca un numero rosso per annullare</p>
+<div class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+    <div>
+        <label class="text-xs text-slate-400">N. Cinquine disponibili:</label>
+        <input type="number" id="input-cinquine" value="1" class="w-full bg-slate-700 p-1 rounded text-white" onchange="updatePremi()">
+    </div>
+    <div>
+        <label class="text-xs text-slate-400">N. Tombole disponibili:</label>
+        <input type="number" id="input-tombole" value="1" class="w-full bg-slate-700 p-1 rounded text-white" onchange="updatePremi()">
+    </div>
+</div>
+
+<div class="flex flex-wrap gap-2 mt-4 justify-center">
+    <button onclick="annunciaPremio('CINQUINA')" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold text-sm">📣 CINQUINA!</button>
+    <button onclick="annunciaPremio('TOMBOLA')" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold text-sm">🏆 TOMBOLA!</button>
+    <button onclick="annunciaPremio('FINE')" class="bg-slate-500 hover:bg-slate-600 px-4 py-2 rounded font-bold text-sm">⛔ FINE GIOCO</button>
+</div>
+
+<div class="mt-4 flex justify-around bg-slate-800 p-2 rounded-lg border border-yellow-500/30">
+    <div class="text-center">
+        <p class="text-[10px] uppercase text-slate-400">Cinquine rimaste</p>
+        <p id="display-cinquine" class="text-2xl font-black text-blue-400">0</p>
+    </div>
+    <div class="text-center">
+        <p class="text-[10px] uppercase text-slate-400">Tombole rimaste</p>
+        <p id="display-tombole" class="text-2xl font-black text-green-400">0</p>
+    </div>
+</div>
             </div>
         </header>
 
