@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tombola Live</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // --- CONFIGURAZIONE FIREBASE ---
+        // Sostituisci questi dati con quelli del tuo progetto Firebase
+        const firebaseConfig = {
+            databaseURL: "https://tombola-53e42-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const tombolaRef = ref(db, 'partita');
+
+        // Determina se è PC (Admin) o Smartphone (User)
+        const isAdmin = !(/Mobi|Android|iPhone/i.test(navigator.userAgent));
+
+        window.onload = () => {
+            renderTabellone();
+            ascoltaCambiamenti();
+            if(isAdmin) document.getElementById('admin-ui').classList.remove('hidden');
+            else document.getElementById('user-ui').classList.remove('hidden');
+        };
+
+        // Genera la griglia 1-90
+        function renderTabellone() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+            for (let i = 1; i <= 90; i++) {
+                const node = document.createElement('div');
+                node.id = `num-${i}`;
+                node.className = "border h-12 flex items-center justify-center font-bold text-lg bg-white rounded shadow-sm transition-all";
+                node.innerText = i;
+                if (isAdmin) {
+                    node.classList.add('cursor-pointer', 'hover:bg-yellow-100');
+                    node.onclick = () => selezionaNumero(i);
+                }
+                container.appendChild(node);
+            }
+        }
+
+        // Funzione Admin: Invia il numero al database
+        window.selezionaNumero = (n) => {
+            set(tombolaRef, { ultimoEstratto: n, timestamp: Date.now() });
+            // Qui potresti anche salvare una lista di tutti i numeri usciti
+        };
+
+        // Funzione User: Ascolta il database
+        function ascoltaCambiamenti() {
+            onValue(tombolaRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    // 1. Mostra l'overlay del numero estratto
+                    const overlay = document.getElementById('overlay-estrazione');
+                    const numDisplay = document.getElementById('numero-grande');
+                    
+                    numDisplay.innerText = data.ultimoEstratto;
+                    overlay.classList.remove('hidden');
+                    overlay.classList.add('flex');
+
+                    // Evidenzia il numero sulla griglia
+                    document.getElementById(`num-${data.ultimoEstratto}`).classList.replace('bg-white', 'bg-red-500');
+                    document.getElementById(`num-${data.ultimoEstratto}`).classList.add('text-white');
+
+                    // Nascondi l'overlay dopo 4 secondi
+                    setTimeout(() => {
+                        overlay.classList.replace('flex', 'hidden');
+                    }, 4000);
+                }
+            });
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <div id="overlay-estrazione" class="hidden fixed inset-0 z-50 bg-black/90 flex-col items-center justify-center text-center p-4 animate-pulse">
+        <h2 class="text-2xl md:text-4xl font-bold text-yellow-400">È STATO ESTRATTO IL NUMERO</h2>
+        <div id="numero-grande" class="text-[12rem] md:text-[20rem] font-black text-white leading-none">--</div>
+    </div>
+
+    <div class="max-w-4xl mx-auto p-4">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-black text-yellow-500 uppercase tracking-tighter">Tombola Live</h1>
+            <p id="admin-ui" class="hidden text-green-400 font-mono text-sm">MODALITÀ OPERATORE ATTIVA</p>
+            <p id="user-ui" class="hidden text-blue-400 font-mono text-sm">MODALITÀ GIOCATORE</p>
+        </header>
+
+        <div id="grid-container" class="grid grid-cols-10 gap-1 md:gap-2 text-slate-900">
+            </div>
+    </div>
+
+</body>
+</html>
